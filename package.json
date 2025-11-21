@@ -11,6 +11,7 @@
   ],
   "activationEvents": [
     "onDebug"
+
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -18,6 +19,11 @@
       {
         "command": "hedgehog.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "hedgehog.start",
+        "title": "start hedgehog",
+        "category" : "hedgehog"
       }
     ]
   },
