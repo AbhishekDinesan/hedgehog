@@ -10,46 +10,25 @@
     "Other"
   ],
   "activationEvents": [
-    "onDebug",
-    "onCommand:hedgehog.start",
-    "onCommand:llm-gdb.snapshot"
+    "onDebug"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "hedgehog.helloWorld",
-        "title": "Hello World"
-      },
-      {
         "command": "hedgehog.start",
-        "title": "start hedgehog",
-        "category": "hedgehog"
+        "title": "Open System Debugger",
+        "category": "Hedgehog"
       },
       {
-        "command": "llm-gdb.snapshot",
-        "title": "LLM-GDB Snapshot",
-        "category": "LLM-GDB"
+        "command": "hedgehog.snapshot",
+        "title": "Capture System Snapshot",
+        "category": "Hedgehog"
       }
     ],
     "configuration": {
       "title": "Hedgehog",
       "properties": {
-        "hedgehog.showMemoryAddresses": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show memory addresses and heap layout in visualizations"
-        },
-        "hedgehog.memoryReadSize": {
-          "type": "number",
-          "default": 64,
-          "description": "Number of bytes to read when displaying memory content (max 256)"
-        },
-        "hedgehog.hideInternalVariables": {
-          "type": "boolean",
-          "default": true,
-          "description": "Hide Python/language internal variables (like __dict__, __class__, etc.)"
-        },
         "hedgehog.visualizationMode": {
           "type": "string",
           "enum": [

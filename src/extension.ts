@@ -1,67 +1,66 @@
 import * as vscode from 'vscode';
-import { WebviewPanelManager } from './webview';
-import { DebugTrackerManager } from './debugTracker';
-import { registerStartCommand, registerSnapshotCommand } from './commands';
-import { isNativeDebuggerAvailable, isCppDebugSession } from './nativeDebugger';
+import { SystemDebugPanel } from './systemDebugPanel';
+import { isNativeDebuggerAvailable, getProcessId } from './nativeDebugger';
 
 export function activate(context: vscode.ExtensionContext) {
-    // Check if native debugger is available
-    const hasNativeDebugger = isNativeDebuggerAvailable();
-    if (hasNativeDebugger) {
-        console.log('✅ Hedgehog: Native Windows debugger loaded - C++ low-level debugging enabled');
-    } else {
-        console.log('ℹ️  Hedgehog: Native debugger not available - Application-level debugging only');
-        console.log('   To enable C++ low-level debugging, run: npm run build:native');
+    if (!isNativeDebuggerAvailable()) {
+        vscode.window.showErrorMessage(
+            'Hedgehog: Native debugger module not built. Run: npm run build:native'
+        );
+        return;
     }
-    
-    const panelManager = new WebviewPanelManager(context);
-    const trackerManager = new DebugTrackerManager();
 
-    const startCommand = registerStartCommand(context, panelManager);
-    const snapshotCommand = registerSnapshotCommand(
-        context,
-        panelManager,
-        (cb) => trackerManager.runWithTrackerSuppressed(cb)
-    );
-    const trackerDisposable = trackerManager.registerDebugAdapterTracker(panelManager);
+    console.log('✅ Hedgehog: Low-level system debugger active');
 
-    // Auto-open panel when debugging starts
-    const debugStartListener = vscode.debug.onDidStartDebugSession((session) => {
+    const systemPanel = new SystemDebugPanel(context);
+
+    const startCommand = vscode.commands.registerCommand('hedgehog.start', () => {
+        systemPanel.show();
+    });
+
+    const snapshotCommand = vscode.commands.registerCommand('hedgehog.snapshot', async () => {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) {
+            vscode.window.showErrorMessage('No active debug session');
+            return;
+        }
+
+        const pid = await getProcessId(session);
+        if (!pid) {
+            vscode.window.showErrorMessage('Could not get process ID');
+            return;
+        }
+
+        await systemPanel.captureSnapshot(pid);
+    });
+
+    const debugStartListener = vscode.debug.onDidStartDebugSession(async (session) => {
         const config = vscode.workspace.getConfiguration('hedgehog');
         const autoOpen = config.get<boolean>('autoOpenPanel', true);
-        
-        // Detect debugging mode
-        const isCpp = isCppDebugSession(session);
-        const mode = isCpp && hasNativeDebugger ? 'C++ Low-Level' : 'Application-Level';
-        
-        console.log(`🦔 Hedgehog: Debug session started (${mode} mode)`);
-        
+
         if (autoOpen) {
-            // Small delay to let debugger settle
-            setTimeout(() => {
-                const panel = panelManager.ensurePanel();
-                panel.reveal(vscode.ViewColumn.Two);
-            }, 500);
+            setTimeout(() => systemPanel.show(), 500);
         }
     });
 
-    // Auto-snapshot when debugger stops (at breakpoint)
-    const debugStopListener = vscode.debug.onDidChangeActiveStackItem(async (stackItem) => {
-        if (!stackItem) return;
-        
+    const debugStopListener = vscode.debug.onDidChangeActiveStackItem(async () => {
+        const session = vscode.debug.activeDebugSession;
+        if (!session) return;
+
         const config = vscode.workspace.getConfiguration('hedgehog');
         const autoSnapshot = config.get<boolean>('autoSnapshot', true);
-        
-        if (autoSnapshot && vscode.debug.activeDebugSession) {
-            // Trigger snapshot command programmatically
-            await vscode.commands.executeCommand('llm-gdb.snapshot');
+
+        if (autoSnapshot) {
+            const pid = await getProcessId(session);
+            if (pid) {
+                await systemPanel.captureSnapshot(pid);
+            }
         }
     });
 
     context.subscriptions.push(
-        startCommand, 
-        snapshotCommand, 
-        trackerDisposable, 
+        startCommand,
+        snapshotCommand,
         debugStartListener,
         debugStopListener
     );
